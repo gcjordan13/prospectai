@@ -37,10 +37,7 @@ const prompt = ai.definePrompt({
   name: 'confirmProspectingScopePrompt',
   input: {
     schema: z.object({
-      conversationHistory: z.array(z.object({
-        role: z.enum(['user', 'assistant']),
-        content: z.string(),
-      })),
+      formattedHistory: z.string().describe('The formatted conversation history'),
     })
   },
   output: {
@@ -49,13 +46,7 @@ const prompt = ai.definePrompt({
   prompt: `You are a prospecting assistant. Your goal is to help the user define their prospecting goals through a conversation.
 
 Here is the conversation history:
-{{#each conversationHistory}}
-{{#if (eq role "user")}}
-User: {{{content}}}
-{{else}}
-Assistant: {{{content}}}
-{{/if}}
-{{/each}}
+{{{formattedHistory}}}
 
 Analyze the user's input from the last message in the conversation history.
 - If the user's goal is clear (including industry, location, and company size), summarize the goal as the 'confirmedScope' and respond with a confirmation message in 'assistantResponse', like "Great! Here is a summary of your goal: [summary]. Does this sound right?".
@@ -71,15 +62,19 @@ const confirmProspectingScopeFlow = ai.defineFlow(
     outputSchema: ConfirmProspectingScopeOutputSchema,
   },
   async input => {
-    // The conversation history now arrives complete and correct from the client.
-    // We can pass it directly to the prompt.
+    // Build the full conversation history including the new user input
     const fullHistory = [
         ...input.conversationHistory,
         { role: 'user' as const, content: input.userInput }
     ];
 
-    const {output} = await prompt({ conversationHistory: fullHistory });
-    
+    // Format the conversation history as a string to avoid Handlebars template issues
+    const formattedHistory = fullHistory
+      .map(msg => msg.role === 'user' ? `User: ${msg.content}` : `Assistant: ${msg.content}`)
+      .join('\n');
+
+    const {output} = await prompt({ formattedHistory });
+
     return output!;
   }
 );
