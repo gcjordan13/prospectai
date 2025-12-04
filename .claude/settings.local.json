@@ -19,7 +19,8 @@
       "Bash(cmd.exe //c \"taskkill //F //PID 21028\")",
       "Bash(wmic process where:*)",
       "Bash(powershell.exe -Command \"Stop-Process -Id 21028 -Force\")",
-      "Bash(echo \"To help diagnose, I need to see what''s in your Firebase terminal. Can you run these commands there and share the output?\n\n1. git status\n2. git log --oneline -5\n3. git remote -v\n\nThis will show us what diverged between your local and Firebase environments.\")"
+      "Bash(echo \"To help diagnose, I need to see what''s in your Firebase terminal. Can you run these commands there and share the output?\n\n1. git status\n2. git log --oneline -5\n3. git remote -v\n\nThis will show us what diverged between your local and Firebase environments.\")",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []

@@ -26,6 +26,7 @@ export type ConfirmProspectingScopeInput = z.infer<typeof ConfirmProspectingScop
 const ConfirmProspectingScopeOutputSchema = z.object({
   assistantResponse: z.string().describe('The AI assistant\'s response, which could be a clarifying question or a confirmation of the scope.'),
   confirmedScope: z.string().optional().describe('The AI confirmed scope of the prospecting goals. This is only returned when the scope is clear.'),
+  numberOfContacts: z.number().optional().describe('The number of contacts the user wants to find. Only returned when scope is confirmed.'),
 });
 export type ConfirmProspectingScopeOutput = z.infer<typeof ConfirmProspectingScopeOutputSchema>;
 
@@ -49,20 +50,9 @@ Here is the conversation history:
 {{/each}}
 
 Analyze the user's input from the last message in the conversation history.
-- If the user's goal is clear (including industry, location, and company size), summarize the goal as the 'confirmedScope' and respond with a confirmation message in 'assistantResponse', like "Great! Here is a summary of your goal: [summary]. Does this sound right?".
-- If the goal is not clear, ask clarifying questions in the 'assistantResponse'. For example, if the industry is missing, ask "What industry are you targeting?". Do not provide a 'confirmedScope' in this case.
-
-Assistant:`,
-});
-
-const confirmProspectingScopeFlow = ai.defineFlow(
-  {
-    name: 'confirmProspectingScopeFlow',
-    inputSchema: ConfirmProspectingScopeInputSchema,
-    outputSchema: ConfirmProspectingScopeOutputSchema,
-  },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
-  }
-);
+- If the user's goal is FULLY clear (including industry, location, company size, AND number of contacts they want), summarize the goal as the 'confirmedScope', extract the number as 'numberOfContacts', and respond with a confirmation message in 'assistantResponse', like "Great! I'll find [numberOfContacts] contacts from [industry] companies in [location] with [size] employees. Does this sound right?".
+- If ANY information is missing (industry, location, company size, OR number of contacts), ask clarifying questions in the 'assistantResponse'. For example:
+  - If industry is missing: "What industry are you targeting?"
+  - If number of contacts is missing: "How many contacts would you like me to find?"
+- Do NOT provide a 'confirmedScope' or 'numberOfContacts' until ALL information is gathered.
+- IMPORTANT: Only provide real, existing companies and contacts. Do not use placeholders or examples.
