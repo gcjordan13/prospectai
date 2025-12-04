@@ -1,0 +1,168 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the Prospector AI application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user.",
+          "format": "email"
+        }
+      },
+      "required": [
+        "id",
+        "email"
+      ]
+    },
+    "ProspectingGoal": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ProspectingGoal",
+      "type": "object",
+      "description": "Represents a specific prospecting goal defined by a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the prospecting goal entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N ProspectingGoal)"
+        },
+        "goalDescription": {
+          "type": "string",
+          "description": "Textual description of the prospecting goal entered by the user."
+        },
+        "scopeConfirmation": {
+          "type": "string",
+          "description": "AI confirmed scope of the prospecting goal."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "goalDescription"
+      ]
+    },
+    "Prospect": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Prospect",
+      "type": "object",
+      "description": "Represents a prospect identified by the AI based on a prospecting goal.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the prospect entity."
+        },
+        "prospectingGoalId": {
+          "type": "string",
+          "description": "Reference to ProspectingGoal. (Relationship: ProspectingGoal 1:N Prospect)"
+        },
+        "companyName": {
+          "type": "string",
+          "description": "Name of the company the prospect belongs to."
+        },
+        "websiteUrl": {
+          "type": "string",
+          "description": "URL of the prospect's company website.",
+          "format": "uri"
+        },
+        "contactName": {
+          "type": "string",
+          "description": "Name of the contact person at the prospect company."
+        },
+        "contactEmail": {
+          "type": "string",
+          "description": "Email address of the contact person.",
+          "format": "email"
+        },
+        "contactPhoneNumber": {
+          "type": "string",
+          "description": "Phone number of the contact person."
+        }
+      },
+      "required": [
+        "id",
+        "prospectingGoalId",
+        "companyName"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles. This path is used for user-specific data.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/prospectingGoals/{prospectingGoalId}",
+        "definition": {
+          "entityName": "ProspectingGoal",
+          "schema": {
+            "$ref": "#/backend/entities/ProspectingGoal"
+          },
+          "description": "Stores prospecting goals defined by users. This path establishes a clear 1:N relationship between users and their goals.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "prospectingGoalId",
+              "description": "The unique identifier of the prospecting goal."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/prospectingGoals/{prospectingGoalId}/prospects/{prospectId}",
+        "definition": {
+          "entityName": "Prospect",
+          "schema": {
+            "$ref": "#/backend/entities/Prospect"
+          },
+          "description": "Stores prospects identified for a specific prospecting goal. This path establishes a clear 1:N relationship between prospecting goals and prospects.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "prospectingGoalId",
+              "description": "The unique identifier of the prospecting goal."
+            },
+            {
+              "name": "prospectId",
+              "description": "The unique identifier of the prospect."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to support the Prospector AI application's core features, focusing on secure access to user-specific data and efficient querying. The structure prioritizes authorization independence, enabling robust security rules without relying on hierarchical `get()` calls. User-owned data, such as Prospecting Goals, are stored within user-specific subcollections (e.g., `/users/{userId}/prospectingGoals/{prospectingGoalId}`), providing clear ownership and simplified security rules. Prospects, related to Prospecting Goals, follow a similar nested structure for the same reasons. This structure allows listing all prospecting goals for a user and all prospects for a given prospecting goal. The design supports QAPs by segregating data based on ownership and providing clear path-based authorization. The denormalization strategy isn't required here because the data does not involve collaborative entities, and ownership is derived directly from the document paths."
+  }
+}

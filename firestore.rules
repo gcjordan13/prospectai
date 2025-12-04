@@ -1,0 +1,162 @@
+/**
+ * Core Philosophy: This ruleset enforces a strict user-ownership model where all
+ * data is siloed within a user's personal data tree. A user can only access
+ * documents located under their own unique user ID path. This provides strong
+ * security and privacy by default.
+ *
+ * Data Structure: The data is organized hierarchically, starting with a top-level
+ * 'users' collection. Each user document, identified by their UID, acts as the
+ * root for all their associated data. Prospecting goals are stored in a
+ * subcollection `/users/{userId}/prospectingGoals`, and the prospects generated
+ * for each goal are further nested in a `/prospects` subcollection.
+ *
+ * Key Security Decisions:
+ * - User Listing Disabled: Listing all documents in the top-level `/users`
+ *   collection is explicitly forbidden to protect user privacy.
+ * - Path-Based Ownership: Authorization is determined solely by the `{userId}`
+ *   wildcard in the document path. A user is considered an "owner" if their
+ *   authenticated UID matches this path parameter.
+ * - No Public Data: There are no publicly readable collections. All access
+ *   requires authentication.
+ *
+ * Denormalization for Authorization: The hierarchical structure `/users/{userId}/...`
+ * serves as the primary mechanism for authorization. This path-based ownership
+ * model is highly performant and secure, as it does not require reading other
+ * documents (e.g., using `get()`) to verify permissions. Ownership is implicit
+ * in the document's location.
+ *
+ * Structural Segregation: This pattern is not required for this data model. The
+ * design naturally separates each user's data into its own tree, eliminating any
+ * potential overlap between private and public information.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --------------------------------------------------------------------
+    // Helper Functions
+    // --------------------------------------------------------------------
+
+    /**
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the authenticated user's ID matches the provided userId.
+     * This is the primary function for establishing document ownership.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Checks for ownership on an existing document. Used for update and delete
+     * operations to prevent acting on non-existent data.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * Validates that a new User document contains an `id` field that
+     * matches the document's path ID.
+     */
+    function isCreatingValidUser(userId) {
+      return request.resource.data.id == userId;
+    }
+
+    /**
+     * Enforces immutability of the User document's `id` field during updates.
+     */
+    function isUpdatingValidUser() {
+      return request.resource.data.id == resource.data.id;
+    }
+
+    /**
+     * Validates that a new ProspectingGoal document contains a `userId` field that
+     * matches the owner's path ID.
+     */
+    function isCreatingValidProspectingGoal(userId) {
+      return request.resource.data.userId == userId;
+    }
+
+    /**
+     * Enforces immutability of the ProspectingGoal's `userId` field during updates.
+     */
+    function isUpdatingValidProspectingGoal() {
+      return request.resource.data.userId == resource.data.userId;
+    }
+
+    /**
+     * Validates that a new Prospect document contains a `prospectingGoalId` field
+     * that matches its parent document's path ID.
+     */
+    function isCreatingValidProspect(prospectingGoalId) {
+      return request.resource.data.prospectingGoalId == prospectingGoalId;
+    }
+
+    /**
+     * Enforces immutability of the Prospect's `prospectingGoalId` field during updates.
+     */
+    function isUpdatingValidProspect() {
+      return request.resource.data.prospectingGoalId == resource.data.prospectingGoalId;
+    }
+
+    // --------------------------------------------------------------------
+    // Collection Rules
+    // --------------------------------------------------------------------
+
+    /**
+     * @description Manages user profile documents. Each user can manage their own
+     *   document but cannot see or list other users.
+     * @path /users/{userId}
+     * @allow (get, update, delete) A signed-in user (auth.uid: 'user_abc') can access their own document at `/users/user_abc`.
+     * @allow (create) A new user (auth.uid: 'user_xyz') can create their own document at `/users/user_xyz`.
+     * @deny (list) No user can list all documents in the `/users` collection.
+     * @deny (get) A user (auth.uid: 'user_abc') cannot get another user's document at `/users/user_xyz`.
+     * @principle Restricts access to a user's own data tree and prevents enumeration of all application users.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && isCreatingValidUser(userId);
+      allow update: if isExistingOwner(userId) && isUpdatingValidUser();
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Manages user-specific prospecting goals. Access is restricted
+     *   to the owner of the parent user document.
+     * @path /users/{userId}/prospectingGoals/{prospectingGoalId}
+     * @allow (get, list, create, update, delete) A user (auth.uid: 'user_abc') can perform any operation on a goal at `/users/user_abc/prospectingGoals/goal_123`.
+     * @deny (get) A user (auth.uid: 'user_xyz') cannot access a goal at `/users/user_abc/prospectingGoals/goal_123`.
+     * @principle Enforces document ownership by inheriting access control from the parent path.
+     */
+    match /users/{userId}/prospectingGoals/{prospectingGoalId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && isCreatingValidProspectingGoal(userId);
+      allow update: if isExistingOwner(userId) && isUpdatingValidProspectingGoal();
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Manages prospects generated for a specific goal. Access is
+     *   restricted to the owner of the root user document.
+     * @path /users/{userId}/prospectingGoals/{prospectingGoalId}/prospects/{prospectId}
+     * @allow (get, list, create, update, delete) A user (auth.uid: 'user_abc') can perform any operation on a prospect at `/users/user_abc/prospectingGoals/goal_123/prospects/prospect_456`.
+     * @deny (get) A user (auth.uid: 'user_xyz') cannot access a prospect at `/users/user_abc/prospectingGoals/goal_123/prospects/prospect_456`.
+     * @principle Enforces document ownership by inheriting access control from the root path, ensuring data privacy deep in the hierarchy.
+     */
+    match /users/{userId}/prospectingGoals/{prospectingGoalId}/prospects/{prospectId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && isCreatingValidProspect(prospectingGoalId);
+      allow update: if isExistingOwner(userId) && isUpdatingValidProspect();
+      allow delete: if isExistingOwner(userId);
+    }
+  }
+}
