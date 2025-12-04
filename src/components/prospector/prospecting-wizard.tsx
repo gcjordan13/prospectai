@@ -8,8 +8,8 @@ import ResultsDisplay from './results-display';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useFirebase } from '@/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useFirebase, addDocumentNonBlocking } from '@/firebase';
+import { collection, serverTimestamp } from 'firebase/firestore';
 
 type ConversationMessage = {
   role: 'user' | 'assistant';
@@ -63,13 +63,11 @@ export default function ProspectingWizard() {
 
     startTransition(async () => {
       try {
-        // Pass the *previous* conversation history and the new message
         const aiResult = await getAiResponse({
           userInput: message,
-          conversationHistory: conversation, // Pass the state *before* the new user message
+          conversationHistory: newConversation, 
         });
         
-        // Add the AI's response to the conversation
         setConversation(prev => [...prev, { role: 'assistant', content: aiResult.assistantResponse }]);
         
         if (aiResult.confirmedScope) {
@@ -81,7 +79,6 @@ export default function ProspectingWizard() {
           title: "An error occurred",
           description: "Failed to get a response from the AI. Please try again.",
         })
-        // On error, add an error message to the conversation
         setConversation(prev => [...prev, { role: 'assistant', content: "I'm sorry, something went wrong. Please try again." }]);
       }
     });
@@ -103,21 +100,27 @@ export default function ProspectingWizard() {
       try {
         const companiesResult = await findCompanies({ prospectingGoals: scope });
         
-        // Save to Firestore
-        const goalRef = await addDoc(collection(firestore, 'users', user.uid, 'prospectingGoals'), {
-          goalDescription: scope,
-          createdAt: serverTimestamp(),
-          userId: user.uid,
+        // Save to Firestore using non-blocking functions
+        const goalsCollectionRef = collection(firestore, 'users', user.uid, 'prospectingGoals');
+        const goalRefPromise = addDocumentNonBlocking(goalsCollectionRef, {
+            goalDescription: scope,
+            createdAt: serverTimestamp(),
+            userId: user.uid,
         });
 
-        const prospectsRef = collection(goalRef, 'prospects');
-        for (let i = 0; i < companiesResult.companies.length; i++) {
-          await addDoc(prospectsRef, {
-            companyName: companiesResult.companies[i],
-            websiteUrl: companiesResult.websites[i] || '',
-            // Mock contacts are not saved, only the companies found by the AI
-          });
-        }
+        // The addDocumentNonBlocking function returns a promise that resolves with the new doc reference
+        goalRefPromise.then(goalRef => {
+            if (goalRef) {
+                const prospectsRef = collection(goalRef, 'prospects');
+                for (let i = 0; i < companiesResult.companies.length; i++) {
+                    addDocumentNonBlocking(prospectsRef, {
+                        companyName: companiesResult.companies[i],
+                        websiteUrl: companiesResult.websites[i] || '',
+                        prospectingGoalId: goalRef.id
+                    });
+                }
+            }
+        });
         
         setCompanyData(companiesResult);
         setStage('scraping');

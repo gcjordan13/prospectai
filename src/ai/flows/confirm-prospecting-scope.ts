@@ -19,7 +19,7 @@ const ConfirmProspectingScopeInputSchema = z.object({
   conversationHistory: z.array(z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string(),
-  })).optional().default([]),
+  })).describe('The entire conversation history.'),
 });
 export type ConfirmProspectingScopeInput = z.infer<typeof ConfirmProspectingScopeInputSchema>;
 
@@ -36,9 +36,7 @@ export async function confirmProspectingScope(input: ConfirmProspectingScopeInpu
 const prompt = ai.definePrompt({
   name: 'confirmProspectingScopePrompt',
   input: {
-    schema: z.object({
-      formattedHistory: z.string().describe('The formatted conversation history'),
-    })
+    schema: ConfirmProspectingScopeInputSchema,
   },
   output: {
     schema: ConfirmProspectingScopeOutputSchema,
@@ -46,7 +44,9 @@ const prompt = ai.definePrompt({
   prompt: `You are a prospecting assistant. Your goal is to help the user define their prospecting goals through a conversation.
 
 Here is the conversation history:
-{{{formattedHistory}}}
+{{#each conversationHistory}}
+{{role}}: {{content}}
+{{/each}}
 
 Analyze the user's input from the last message in the conversation history.
 - If the user's goal is clear (including industry, location, and company size), summarize the goal as the 'confirmedScope' and respond with a confirmation message in 'assistantResponse', like "Great! Here is a summary of your goal: [summary]. Does this sound right?".
@@ -62,19 +62,7 @@ const confirmProspectingScopeFlow = ai.defineFlow(
     outputSchema: ConfirmProspectingScopeOutputSchema,
   },
   async input => {
-    // Build the full conversation history including the new user input
-    const fullHistory = [
-        ...input.conversationHistory,
-        { role: 'user' as const, content: input.userInput }
-    ];
-
-    // Format the conversation history as a string to avoid Handlebars template issues
-    const formattedHistory = fullHistory
-      .map(msg => msg.role === 'user' ? `User: ${msg.content}` : `Assistant: ${msg.content}`)
-      .join('\n');
-
-    const {output} = await prompt({ formattedHistory });
-
+    const {output} = await prompt(input);
     return output!;
   }
 );

@@ -12,11 +12,10 @@ import {
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import {
-  Auth, // Import Auth type for type hinting
+  Auth,
   signInAnonymously,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  // Assume getAuth and app are initialized elsewhere
 } from 'firebase/auth';
 
 /**
@@ -35,7 +34,6 @@ export function setDocumentNonBlocking(docRef: DocumentReference, data: any, opt
       })
     )
   })
-  // Execution continues immediately
 }
 
 
@@ -44,9 +42,9 @@ export function setDocumentNonBlocking(docRef: DocumentReference, data: any, opt
  * Does NOT await the write operation internally.
  * Returns the Promise for the new doc ref, but typically not awaited by caller.
  */
-export function addDocumentNonBlocking(colRef: CollectionReference, data: any) {
-  const promise = addDoc(colRef, data)
-    .catch(error => {
+export function addDocumentNonBlocking(colRef: CollectionReference, data: any): Promise<DocumentReference> {
+  const promise = addDoc(colRef, data);
+  promise.catch(error => {
       errorEmitter.emit(
         'permission-error',
         new FirestorePermissionError({
@@ -98,21 +96,15 @@ export function deleteDocumentNonBlocking(docRef: DocumentReference) {
 
 /** Initiate anonymous sign-in (non-blocking). */
 export function initiateAnonymousSignIn(authInstance: Auth): void {
-  // CRITICAL: Call signInAnonymously directly. Do NOT use 'await signInAnonymously(...)'.
   signInAnonymously(authInstance);
-  // Code continues immediately. Auth state change is handled by onAuthStateChanged listener.
 }
 
 /** Initiate email/password sign-up (non-blocking). */
 export function initiateEmailSignUp(authInstance: Auth, email: string, password: string): void {
-  // CRITICAL: Call createUserWithEmailAndPassword directly. Do NOT use 'await createUserWithEmailAndPassword(...)'.
   createUserWithEmailAndPassword(authInstance, email, password);
-  // Code continues immediately. Auth state change is handled by onAuthStateChanged listener.
 }
 
 /** Initiate email/password sign-in (non-blocking). */
 export function initiateEmailSignIn(authInstance: Auth, email: string, password: string): void {
-  // CRITICAL: Call signInWithEmailAndPassword directly. Do NOT use 'await signInWithEmailAndPassword(...)'.
   signInWithEmailAndPassword(authInstance, email, password);
-  // Code continues immediately. Auth state change is handled by onAuthStateChanged listener.
 }

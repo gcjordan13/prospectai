@@ -5,7 +5,21 @@
       "Bash(npm install)",
       "Bash(nul)",
       "Bash(timeout /t 10)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(if exist nul del nul)",
+      "Bash(git push:*)",
+      "Bash(cat:*)",
+      "Bash(printf:*)",
+      "Bash(\"C:\\Users\\gabri\\Downloads\\prospectai\\src\\ai\\flows\\confirm-prospecting-scope.ts\")",
+      "Bash(git checkout:*)",
+      "Bash(taskkill:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(cmd.exe //c \"taskkill //F //PID 21028\")",
+      "Bash(wmic process where:*)",
+      "Bash(powershell.exe -Command \"Stop-Process -Id 21028 -Force\")",
+      "Bash(echo \"To help diagnose, I need to see what''s in your Firebase terminal. Can you run these commands there and share the output?\n\n1. git status\n2. git log --oneline -5\n3. git remote -v\n\nThis will show us what diverged between your local and Firebase environments.\")"
     ],
     "deny": [],
     "ask": []
